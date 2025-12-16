@@ -59,9 +59,9 @@
 <script type="importmap">
 {
   "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
@@ -98,7 +98,7 @@
 
     // Offsets for Standard Tuning (E2, A2, D3, G3, B3, E4)
     const STRING_OFFSETS = [0, 5, 10, 15, 19, 24];
-    const TOTAL_FRETS = 13;
+    const TOTAL_FRETS = 25; // 0 to 24 inclusive
     const STRINGS = ['E', 'A', 'D', 'G', 'B', 'e'];
 
     // --- LOGIC ---
@@ -267,20 +267,27 @@
 
       return (
         <div className="w-full overflow-x-auto pb-8 pt-4 select-none">
-          <div className="relative min-w-[800px] px-4">
+          <div className="relative min-w-max px-4">
             {/* Nut (Fret 0) Indicator */}
-            <div className="absolute left-10 top-0 bottom-0 w-2 bg-neutral-700/80 z-10 rounded-sm"></div>
+            <div className="absolute left-10 top-0 bottom-0 w-2 bg-neutral-600 z-10 rounded-sm"></div>
 
             {/* Fret Markers (Dots) */}
             <div className="absolute inset-0 pointer-events-none z-0">
-                 {[3, 5, 7, 9].map(fret => (
+                 {/* Single Dots */}
+                 {[3, 5, 7, 9, 15, 17, 19, 21].map(fret => (
                    <div key={`dot-${fret}`} className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
                         style={{ left: `${(fret * 80) + 40 + 20}px` }}></div>
                  ))}
+                 {/* Double Dot 12 */}
                  <div className="absolute top-1/3 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
                       style={{ left: `${(12 * 80) + 40 + 20}px` }}></div>
                  <div className="absolute top-2/3 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
                       style={{ left: `${(12 * 80) + 40 + 20}px` }}></div>
+                 {/* Double Dot 24 */}
+                 <div className="absolute top-1/3 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
+                      style={{ left: `${(24 * 80) + 40 + 20}px` }}></div>
+                 <div className="absolute top-2/3 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
+                      style={{ left: `${(24 * 80) + 40 + 20}px` }}></div>
             </div>
 
             {/* Grid */}
@@ -309,7 +316,7 @@
                       <div
                         key={`s${stringIdx}-f${fret}`}
                         onClick={() => onSelect({ stringIndex: stringIdx, fret })}
-                        className="relative h-12 flex-shrink-0 cursor-pointer flex items-center justify-center border-r border-neutral-700 hover:bg-white/5 transition-colors"
+                        className="relative h-12 flex-shrink-0 cursor-pointer flex items-center justify-center border-r border-neutral-600 hover:bg-white/5 transition-colors"
                         style={{ width: fret === 0 ? '50px' : '80px' }}
                       >
                         {/* Ghost Note */}
@@ -340,7 +347,7 @@
             {/* Fret Numbers */}
             <div className="flex pl-[50px]">
                {frets.slice(1).map(fret => (
-                 <div key={`num-${fret}`} className="w-[80px] text-center text-xs text-neutral-500 pt-2 font-mono font-medium">
+                 <div key={`num-${fret}`} className="w-[80px] text-center text-xs text-neutral-400 pt-2 font-mono font-medium">
                    {fret}
                  </div>
                ))}
@@ -379,14 +386,14 @@
         return null;
       }, [rootNote, targetNote]);
 
-      // Calculate Ghost Notes (All octaves of Root) for Descending Mode
+      // Calculate Ghost Notes (All octaves of Root) - ALWAYS show if Root exists
       const ghostNotes = useMemo(() => {
-        if (intervalResult?.mode === CalculationMode.DESCENDING && rootNote) {
+        if (rootNote) {
           const rootPitch = getPitch(rootNote);
           return getAllPositionsForPitchClass(rootPitch);
         }
         return [];
-      }, [intervalResult, rootNote]);
+      }, [rootNote]);
 
       return (
         <div className="min-h-screen bg-neutral-950 text-neutral-200 font-sans flex flex-col">
@@ -433,8 +440,8 @@
                 <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-xs">C</div>
                 <span>Cible</span>
               </div>
-              {intervalResult?.mode === CalculationMode.DESCENDING && ghostNotes.length > 0 && (
-                 <div className="flex items-center space-x-2 animate-pulse">
+              {rootNote && ghostNotes.length > 0 && (
+                 <div className="flex items-center space-x-2">
                   <div className="w-6 h-6 rounded-full border-2 border-dashed border-neutral-500"></div>
                   <span>Octaves Tonique</span>
                 </div>

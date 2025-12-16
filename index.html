@@ -1,64 +1,453 @@
 <!DOCTYPE html>
 <html lang="fr" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Calculateur d'Intervalles</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              fretboard: '#1a1a1a',
-              fret: '#404040',
-              string: '#737373',
-              root: '#06b6d4', // Cyan 500
-              target: '#f43f5e', // Rose 500
-            },
-            fontFamily: {
-              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
-            }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculateur d'Intervalles</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            fretboard: '#1a1a1a',
+            fret: '#404040',
+            string: '#737373',
+            root: '#06b6d4', // Cyan 500
+            target: '#f43f5e', // Rose 500
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
           }
         }
       }
-    </script>
-    <style>
-      body {
-        background-color: #0a0a0a;
-        color: #e5e5e5;
-        overscroll-behavior: none;
-      }
-      /* Custom scrollbar for minimalist look */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #0a0a0a; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #262626; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #404040; 
-      }
-    </style>
-  <script type="importmap">
+    }
+  </script>
+
+  <!-- React & ReactDOM (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel (to compile JSX in browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      background-color: #0a0a0a;
+      color: #e5e5e5;
+      overscroll-behavior: none;
+    }
+    /* Custom scrollbar for minimalist look */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0a0a0a; 
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #262626; 
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #404040; 
+    }
+  </style>
+<script type="importmap">
 {
   "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react": "https://esm.sh/react@^19.2.3"
   }
 }
 </script>
 </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // --- CONSTANTS & TYPES ---
+
+    const CalculationMode = {
+      ASCENDING: 'ASCENDING',
+      DESCENDING: 'DESCENDING',
+      UNISON: 'UNISON'
+    };
+
+    const INTERVAL_NAMES = [
+      "Unisson",             // 0
+      "Seconde mineure",     // 1
+      "Seconde majeure",     // 2
+      "Tierce mineure",      // 3
+      "Tierce majeure",      // 4
+      "Quarte juste",        // 5
+      "Triton",              // 6
+      "Quinte juste",        // 7
+      "Sixte mineure",       // 8
+      "Sixte majeure",       // 9
+      "Septième mineure",    // 10
+      "Septième majeure",    // 11
+      "Octave"               // 12
+    ];
+
+    // Offsets for Standard Tuning (E2, A2, D3, G3, B3, E4)
+    const STRING_OFFSETS = [0, 5, 10, 15, 19, 24];
+    const TOTAL_FRETS = 13;
+    const STRINGS = ['E', 'A', 'D', 'G', 'B', 'e'];
+
+    // --- LOGIC ---
+
+    const getPitch = (pos) => {
+      return STRING_OFFSETS[pos.stringIndex] + pos.fret;
+    };
+
+    const getPositionsForPitch = (pitch) => {
+      const positions = [];
+      for (let stringIndex = 0; stringIndex < STRING_OFFSETS.length; stringIndex++) {
+        const basePitch = STRING_OFFSETS[stringIndex];
+        const fret = pitch - basePitch;
+        if (fret >= 0 && fret < TOTAL_FRETS) {
+          positions.push({ stringIndex, fret });
+        }
+      }
+      return positions;
+    };
+
+    const getAllPositionsForPitchClass = (pitch) => {
+      const targetClass = pitch % 12;
+      const positions = [];
+      
+      for (let stringIndex = 0; stringIndex < STRING_OFFSETS.length; stringIndex++) {
+        const stringBase = STRING_OFFSETS[stringIndex];
+        let offset = (targetClass - stringBase) % 12;
+        if (offset < 0) offset += 12;
+        
+        for (let fret = offset; fret < TOTAL_FRETS; fret += 12) {
+          positions.push({ stringIndex, fret });
+        }
+      }
+      return positions;
+    };
+
+    const formatTones = (num) => {
+      return num.toString().replace('.', ',');
+    };
+
+    const calculateInterval = (root, target) => {
+      const rootPitch = getPitch(root);
+      const targetPitch = getPitch(target);
+      const diff = targetPitch - rootPitch;
+
+      if (diff === 0) {
+        return {
+          semitonesDiff: 0,
+          tonesDiff: 0,
+          mode: CalculationMode.UNISON,
+          name: INTERVAL_NAMES[0],
+          formula: "Même note"
+        };
+      }
+
+      const isAscending = diff > 0;
+      const absDiff = Math.abs(diff);
+      const absTones = absDiff / 2;
+
+      if (isAscending) {
+        const nameIndex = absDiff % 12;
+        const displayName = (nameIndex === 0 && absDiff > 0) ? "Octave" : INTERVAL_NAMES[nameIndex];
+
+        return {
+          semitonesDiff: diff,
+          tonesDiff: absTones,
+          mode: CalculationMode.ASCENDING,
+          name: displayName,
+          formula: `+ ${formatTones(absTones)}`
+        };
+      } else {
+        const effectiveSemitonesDown = absDiff % 12;
+        const effectiveTonesDown = effectiveSemitonesDown / 2;
+        const resultTones = 6 - effectiveTonesDown;
+        const resultSemitones = resultTones * 2; 
+
+        return {
+          semitonesDiff: diff,
+          tonesDiff: absTones, 
+          mode: CalculationMode.DESCENDING,
+          name: INTERVAL_NAMES[Math.round(resultSemitones)], 
+          formula: effectiveSemitonesDown === 0 
+            ? "Octave" 
+            : `6 - ${formatTones(effectiveTonesDown)} = ${formatTones(resultTones)}`
+        };
+      }
+    };
+
+    // --- COMPONENTS ---
+
+    const InfoPanel = ({ result, hasRoot }) => {
+      if (!hasRoot) {
+        return (
+          <div className="h-48 flex flex-col items-center justify-center text-neutral-500 animate-pulse">
+            <p className="text-lg">Sélectionnez une note fondamentale (Tonique)</p>
+          </div>
+        );
+      }
+
+      if (!result) {
+        return (
+          <div className="h-48 flex flex-col items-center justify-center text-neutral-400">
+            <p className="text-lg">Sélectionnez une note cible</p>
+          </div>
+        );
+      }
+
+      const isDescending = result.mode === CalculationMode.DESCENDING;
+      const isAscending = result.mode === CalculationMode.ASCENDING;
+      const isUnison = result.mode === CalculationMode.UNISON;
+
+      return (
+        <div className="h-48 w-full max-w-2xl mx-auto p-6 bg-neutral-900/50 rounded-2xl border border-neutral-800 flex flex-col items-center justify-center text-center">
+          
+          {isDescending ? (
+            <div className="flex flex-col items-center space-y-3">
+              <div className="text-sm font-bold text-rose-400 uppercase tracking-widest flex items-center gap-2">
+                <span>↓ Descendant</span>
+                <span className="opacity-50">(- {result.formula.split(' = ')[0].split(' - ')[1]} tons)</span>
+              </div>
+              
+              <div className="bg-neutral-800/50 px-4 py-2 rounded-lg border border-neutral-700/50">
+                 <span className="text-xs text-neutral-400 uppercase mr-2 font-mono">Règle de l'Octave</span>
+                 <span className="text-2xl font-mono text-neutral-200">
+                   {result.formula}
+                 </span>
+                 <span className="text-lg text-neutral-500 ml-2">tons</span>
+              </div>
+
+              <div className="text-3xl font-bold text-rose-400 tracking-wide mt-1">
+                {result.name}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center space-y-4">
+               {isAscending && (
+                 <span className="text-sm text-cyan-500/80 font-mono uppercase tracking-widest">Ascendant</span>
+               )}
+               
+               <div className="text-4xl md:text-5xl font-light font-mono text-neutral-100 tracking-tight">
+                {result.formula} {(!isUnison && !result.formula.includes('=')) && <span className="text-2xl text-neutral-500">tons</span>}
+              </div>
+
+              <div className={`text-xl md:text-2xl font-bold tracking-wide 
+                ${isUnison ? 'text-white' : 'text-cyan-400'}
+              `}>
+                {result.name}
+              </div>
+            </div>
+          )}
+          
+        </div>
+      );
+    };
+
+    const Fretboard = ({ root, target, ghosts = [], onSelect }) => {
+      const frets = Array.from({ length: TOTAL_FRETS }, (_, i) => i);
+      const visualStringIndices = [5, 4, 3, 2, 1, 0];
+
+      const isSelected = (stringIdx, fretIdx, type) => {
+        if (type === 'root') return root?.stringIndex === stringIdx && root?.fret === fretIdx;
+        if (type === 'target') return target?.stringIndex === stringIdx && target?.fret === fretIdx;
+        if (type === 'ghost') return ghosts.some(g => g.stringIndex === stringIdx && g.fret === fretIdx);
+        return false;
+      };
+
+      return (
+        <div className="w-full overflow-x-auto pb-8 pt-4 select-none">
+          <div className="relative min-w-[800px] px-4">
+            {/* Nut (Fret 0) Indicator */}
+            <div className="absolute left-10 top-0 bottom-0 w-2 bg-neutral-700/80 z-10 rounded-sm"></div>
+
+            {/* Fret Markers (Dots) */}
+            <div className="absolute inset-0 pointer-events-none z-0">
+                 {[3, 5, 7, 9].map(fret => (
+                   <div key={`dot-${fret}`} className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
+                        style={{ left: `${(fret * 80) + 40 + 20}px` }}></div>
+                 ))}
+                 <div className="absolute top-1/3 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
+                      style={{ left: `${(12 * 80) + 40 + 20}px` }}></div>
+                 <div className="absolute top-2/3 -translate-y-1/2 w-4 h-4 bg-neutral-800 rounded-full"
+                      style={{ left: `${(12 * 80) + 40 + 20}px` }}></div>
+            </div>
+
+            {/* Grid */}
+            <div className="flex flex-col relative z-20">
+              {visualStringIndices.map((stringIdx) => (
+                <div key={`string-${stringIdx}`} className="flex items-center h-12 relative group">
+                  
+                  {/* String Line */}
+                  <div 
+                    className="absolute left-0 right-0 top-1/2 -translate-y-1/2 bg-neutral-500 group-hover:bg-neutral-400 transition-colors"
+                    style={{ height: `${1 + (6 - stringIdx) * 0.4}px` }}
+                  ></div>
+
+                  {/* String Name */}
+                  <div className="absolute -left-6 w-6 text-xs text-neutral-400 font-bold font-mono flex justify-center">
+                    {STRINGS[stringIdx]}
+                  </div>
+
+                  {/* Frets */}
+                  {frets.map((fret) => {
+                    const isRoot = isSelected(stringIdx, fret, 'root');
+                    const isTarget = isSelected(stringIdx, fret, 'target');
+                    const isGhost = !isRoot && !isTarget && isSelected(stringIdx, fret, 'ghost');
+
+                    return (
+                      <div
+                        key={`s${stringIdx}-f${fret}`}
+                        onClick={() => onSelect({ stringIndex: stringIdx, fret })}
+                        className="relative h-12 flex-shrink-0 cursor-pointer flex items-center justify-center border-r border-neutral-700 hover:bg-white/5 transition-colors"
+                        style={{ width: fret === 0 ? '50px' : '80px' }}
+                      >
+                        {/* Ghost Note */}
+                        {isGhost && (
+                          <div className="w-8 h-8 rounded-full border-2 border-dashed border-neutral-500 opacity-60 flex items-center justify-center z-10 animate-pulse">
+                          </div>
+                        )}
+
+                        {/* Active Notes */}
+                        {(isRoot || isTarget) && (
+                          <div className={`
+                            w-9 h-9 rounded-full flex items-center justify-center shadow-lg transform transition-transform duration-200 scale-100
+                            ${isRoot ? 'bg-cyan-500 text-black z-30' : ''}
+                            ${isTarget ? 'bg-rose-500 text-white z-20' : ''}
+                            ${isRoot && isTarget ? 'ring-4 ring-rose-500 bg-cyan-500' : ''} 
+                          `}>
+                             {isRoot && <span className="font-extrabold text-sm font-mono">T</span>}
+                             {isTarget && !isRoot && <span className="font-extrabold text-sm font-mono">C</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            
+            {/* Fret Numbers */}
+            <div className="flex pl-[50px]">
+               {frets.slice(1).map(fret => (
+                 <div key={`num-${fret}`} className="w-[80px] text-center text-xs text-neutral-500 pt-2 font-mono font-medium">
+                   {fret}
+                 </div>
+               ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [rootNote, setRootNote] = useState(null);
+      const [targetNote, setTargetNote] = useState(null);
+
+      const handleNoteSelect = (pos) => {
+        if (!rootNote) {
+          setRootNote(pos);
+          return;
+        }
+        if (rootNote.stringIndex === pos.stringIndex && rootNote.fret === pos.fret) {
+          setRootNote(null);
+          setTargetNote(null);
+          return;
+        }
+        setTargetNote(pos);
+      };
+
+      const handleReset = () => {
+        setRootNote(null);
+        setTargetNote(null);
+      };
+
+      const intervalResult = useMemo(() => {
+        if (rootNote && targetNote) {
+          return calculateInterval(rootNote, targetNote);
+        }
+        return null;
+      }, [rootNote, targetNote]);
+
+      // Calculate Ghost Notes (All octaves of Root) for Descending Mode
+      const ghostNotes = useMemo(() => {
+        if (intervalResult?.mode === CalculationMode.DESCENDING && rootNote) {
+          const rootPitch = getPitch(rootNote);
+          return getAllPositionsForPitchClass(rootPitch);
+        }
+        return [];
+      }, [intervalResult, rootNote]);
+
+      return (
+        <div className="min-h-screen bg-neutral-950 text-neutral-200 font-sans flex flex-col">
+          
+          {/* Header */}
+          <header className="p-6 flex justify-between items-center border-b border-neutral-900 bg-neutral-950/80 backdrop-blur-sm sticky top-0 z-50">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-white">Intervalle<span className="text-cyan-500">Master</span></h1>
+              <p className="text-xs text-neutral-500 mt-1">Calculateur de tons et d'intervalles</p>
+            </div>
+            <button 
+              onClick={handleReset}
+              className="px-4 py-2 text-xs font-mono bg-neutral-900 hover:bg-neutral-800 text-neutral-400 rounded border border-neutral-800 transition-all active:scale-95"
+            >
+              RÉINITIALISER
+            </button>
+          </header>
+
+          {/* Main Content */}
+          <main className="flex-grow flex flex-col items-center justify-start pt-8 pb-12 space-y-12">
+            
+            {/* Results Panel */}
+            <div className="w-full px-4">
+               <InfoPanel result={intervalResult} hasRoot={!!rootNote} />
+            </div>
+
+            {/* The Guitar Neck */}
+            <div className="w-full border-y border-neutral-900 bg-[#121212]">
+              <Fretboard 
+                root={rootNote} 
+                target={targetNote} 
+                ghosts={ghostNotes}
+                onSelect={handleNoteSelect} 
+              />
+            </div>
+
+            {/* Instructions / Legend */}
+            <div className="flex flex-wrap justify-center gap-6 text-sm text-neutral-400 font-mono px-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 rounded-full bg-cyan-500 text-black flex items-center justify-center font-bold text-xs">T</div>
+                <span>Tonique</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-xs">C</div>
+                <span>Cible</span>
+              </div>
+              {intervalResult?.mode === CalculationMode.DESCENDING && ghostNotes.length > 0 && (
+                 <div className="flex items-center space-x-2 animate-pulse">
+                  <div className="w-6 h-6 rounded-full border-2 border-dashed border-neutral-500"></div>
+                  <span>Octaves Tonique</span>
+                </div>
+              )}
+            </div>
+
+          </main>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
 </html>

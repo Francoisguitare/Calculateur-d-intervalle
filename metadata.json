@@ -1,0 +1,5 @@
+{
+  "name": "Calculateur d'Intervalles Guitare",
+  "description": "Un outil minimaliste pour visualiser et calculer les intervalles sur un manche de guitare. Conçu pour les étudiants, avec un mode sombre et une logique d'inversion d'intervalles.",
+  "requestFramePermissions": []
+}
